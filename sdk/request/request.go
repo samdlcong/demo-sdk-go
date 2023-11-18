@@ -7,6 +7,7 @@ type Request interface {
 	GetHeaders() map[string]string
 }
 
+// Request is the base struct of service requests
 type BaseRequest struct {
 	URL     string
 	Method  string
@@ -30,6 +31,7 @@ func (r BaseRequest) GetHeaders() map[string]string {
 	return r.Header
 }
 
+// AddHeader only adds pin or erp, they will be encoded to base64 code
 func (r *BaseRequest) AddHeader(key, value string) {
 	if r.Header == nil {
 		r.Header = make(map[string]string)
