@@ -2,7 +2,7 @@ package sdk
 
 // Credential is used to sign the request
 type Credential struct {
-	SecertID  string
+	SecretID  string
 	SecretKey string
 }
 
