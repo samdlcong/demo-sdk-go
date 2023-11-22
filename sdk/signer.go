@@ -1,6 +1,7 @@
 package sdk
 
 import (
+	"bytes"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
@@ -275,4 +276,27 @@ func getURIPath(u *url.URL) string {
 	}
 
 	return uri
+}
+
+// EscapePath escapes part of a URL path
+func EscapePath(path string, encodeSep bool) string {
+	var buf bytes.Buffer
+	for i := 0; i < len(path); i++ {
+		c := path[i]
+		if noEscape[c] || (c == '/' && !encodeSep) {
+			buf.WriteByte(c)
+		} else {
+			fmt.Fprintf(&buf, "%%%02X", c)
+		}
+	}
+	return buf.String()
+}
+
+func shouldIgnore(header string, ignoreHeaders []string) bool {
+	for _, v := range ignoreHeaders {
+		if v == header {
+			return true
+		}
+	}
+	return false
 }

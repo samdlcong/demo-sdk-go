@@ -2,9 +2,14 @@ package sdk
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"github.com/samdlcong/demo-sdk-go/sdk/log"
 	"github.com/samdlcong/demo-sdk-go/sdk/request"
+	urllib "net/url"
 	"reflect"
+	"regexp"
+	"strings"
 )
 
 var baseRequestFileds []string
@@ -41,7 +46,23 @@ func (b WithBodyBuilder) BuildURL(url string, paramJson []byte) (string, error) 
 	err := json.Unmarshal(paramJson, &paramMap)
 	if err != nil {
 		b.Logger.Errorf("%s", err.Error())
+		return "", err
 	}
+
+	resultUrl, err := replaceUrlWithPathParam(url, paramMap)
+	if err != nil {
+		b.Logger.Errorf("%s", err.Error())
+		return "", err
+	}
+
+	queryParams := buildQueryParams(paramMap, url)
+	encodedUrl, err := encodeUrl(resultUrl, queryParams)
+	if err != nil {
+		return "", err
+	}
+	b.Logger.Infof("%s", string(paramJson))
+	b.Logger.Infof("URL=%s", encodedUrl)
+	return encodedUrl, nil
 }
 
 func (b WithBodyBuilder) BuildBody(paramJson []byte) (string, error) {
@@ -58,4 +79,84 @@ func (b WithoutBodyBuilder) BuildURL(url string, paramJson []byte) (string, erro
 
 func (b WithoutBodyBuilder) BuildBody(paramJson []byte) (string, error) {
 
+}
+
+func replaceUrlWithPathParam(url string, paramMap map[string]interface{}) (string, error) {
+	r, _ := regexp.Compile("{[a-zA-Z0-9-_]+}")
+	matches := r.FindAllString(url, -1)
+	for _, match := range matches {
+		field := strings.TrimLeft(match, "{")
+		field = strings.TrimRight(field, "}")
+		value, ok := paramMap[field]
+		if !ok {
+			return "", errors.New("Can not find path parameter: " + field)
+		}
+
+		valueStr := fmt.Sprintf("%v", value)
+		url = strings.Replace(url, match, valueStr, -1)
+	}
+
+	return url, nil
+}
+
+func encodeUrl(requestUrl string, values urllib.Values) (string, error) {
+	urlObj, err := urllib.Parse(requestUrl)
+	if err != nil {
+		return "", err
+	}
+
+	urlObj.RawPath = EscapePath(urlObj.Path, false)
+	uri := urlObj.EscapedPath()
+
+	if values != nil {
+		queryParam := values.Encode()
+		queryParam = strings.Replace(queryParam, "+", "%20", -1)
+		if queryParam != "" {
+			uri += "?" + queryParam
+		}
+	}
+
+	return uri, nil
+}
+
+func buildQueryParams(paramMap map[string]interface{}, url string) urllib.Values {
+	values := urllib.Values{}
+	accessMap(paramMap, url, "", values)
+	return values
+}
+
+func accessMap(paramMap map[string]interface{}, url, prefix string, values urllib.Values) {
+	for k, v := range paramMap {
+		if shouldIgnoreField(url, k) {
+			continue
+		}
+
+		switch e := v.(type) {
+		case []interface{}:
+			for i, n := range e {
+				switch f := n.(type) {
+				case map[string]interface{}:
+					subPrefix := fmt.Sprintf("%s.%d.", k, i+1)
+					accessMap(f, url, subPrefix, values)
+				case nil:
+				default:
+					values.Set(fmt.Sprintf("%s.%s.%d", prefix, k, i+1), fmt.Sprintf("%s", n))
+				}
+			}
+		case nil:
+		default:
+			values.Set(fmt.Sprintf("%s%s", prefix, k), fmt.Sprintf("%v", v))
+		}
+	}
+}
+
+func shouldIgnoreField(url, field string) bool {
+	flag := "{" + field + "}"
+	if strings.Contains(url, flag) {
+		return true
+	}
+	if includes(baseRequestFileds, field) {
+		return true
+	}
+	return false
 }
