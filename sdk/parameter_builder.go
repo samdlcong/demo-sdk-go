@@ -66,7 +66,22 @@ func (b WithBodyBuilder) BuildURL(url string, paramJson []byte) (string, error) 
 }
 
 func (b WithBodyBuilder) BuildBody(paramJson []byte) (string, error) {
+	paramMap := make(map[string]interface{})
+	err := json.Unmarshal(paramJson, &paramMap)
+	if err != nil {
+		b.Logger.Errorf("%s", err.Error())
+		return "", err
+	}
 
+	for k := range paramMap {
+		if includes(baseRequestFileds, k) {
+			delete(paramMap, k)
+		}
+	}
+
+	body, _ := json.Marshal(paramMap)
+	b.Logger.Infof("Body=%s", string(body))
+	return string(body), nil
 }
 
 type WithoutBodyBuilder struct {
@@ -78,7 +93,7 @@ func (b WithoutBodyBuilder) BuildURL(url string, paramJson []byte) (string, erro
 }
 
 func (b WithoutBodyBuilder) BuildBody(paramJson []byte) (string, error) {
-
+	return "", nil
 }
 
 func replaceUrlWithPathParam(url string, paramMap map[string]interface{}) (string, error) {
