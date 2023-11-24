@@ -89,7 +89,28 @@ type WithoutBodyBuilder struct {
 }
 
 func (b WithoutBodyBuilder) BuildURL(url string, paramJson []byte) (string, error) {
+	paramMap := make(map[string]interface{})
+	err := json.Unmarshal(paramJson, &paramMap)
+	if err != nil {
+		b.Logger.Errorf("%s", err.Error())
+		return "", err
+	}
 
+	resultUrl, err := replaceUrlWithPathParam(url, paramMap)
+	if err != nil {
+		b.Logger.Errorf("%s", err.Error())
+		return "", err
+	}
+
+	queryParams := buildQueryParams(paramMap, url)
+	encodedUrl, err := encodeUrl(resultUrl, queryParams)
+	if err != nil {
+		return "", err
+	}
+
+	b.Logger.Infof("%s", string(paramJson))
+	b.Logger.Infof("URL=%s", encodedUrl)
+	return encodedUrl, nil
 }
 
 func (b WithoutBodyBuilder) BuildBody(paramJson []byte) (string, error) {
