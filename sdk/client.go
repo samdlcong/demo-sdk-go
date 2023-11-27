@@ -54,6 +54,8 @@ func (c *Client) WithConfig(config *Config) *Client {
 	return c
 }
 
+// Send the request and return the response to the client.
+// Parameter request accepts concrete request object which follow Request.
 func (c *Client) Send(req request.Request, resp response.Response) error {
 	method := req.GetMethod()
 	builder := GetParameterBuilder(method, c.Logger)
